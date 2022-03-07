@@ -5,6 +5,7 @@ import logging.handlers
 import os
 
 import trakt
+from requests import request
 from trakt.tv import TVShow
 from trakt.users import User
 
@@ -41,7 +42,7 @@ def setup_logging():
 
 def save_config(config):
     logger.info("Saving config")
-    with open(DATA_DIR + "\config.ini", "w") as configfile:
+    with open(DATA_DIR + "/config.ini", "w") as configfile:
         config.write(configfile)
 
 
@@ -58,11 +59,11 @@ def get_config():
     if not os.path.isdir(DATA_DIR):
         os.mkdir(DATA_DIR)
 
-    if not os.path.isfile(DATA_DIR + "\config.ini"):
+    if not os.path.isfile(DATA_DIR + "/config.ini"):
         logger.info("No config file found, creating one")
         save_config(config)
 
-    config.read(DATA_DIR + "\config.ini")
+    config.read(DATA_DIR + "/config.ini")
 
     return config
 
@@ -135,7 +136,7 @@ def get_anime_shows(shows, shows_cache, force_update=False):
                 shows_dict["other"].append(show.slug)
         else:
             logger.info(f"No genres found for {show.title}")
-    print("Shows Filtered")
+    logger.info("Shows Filtered")
     return shows_dict
 
 
@@ -145,8 +146,34 @@ def get_anime_movies(movies):
     for movie in movies:
         if movie.genres:
             print(movie.title, ":", movie.genres)
-    print("Movies Filtered")
+    logger.info("Movies Filtered")
     return anime_movies, other_movies
+
+
+def verify_anime_list():
+    obtain = False
+    if not os.path.isfile(DATA_DIR + "/anime_list.json"):
+        obtain = True
+    else:
+        with open(DATA_DIR + "/anime_list.json") as f:
+            data = json.load(f)
+        today = datetime.datetime.today()
+        file_date = datetime.datetime.strptime(data["date"], "%Y-%m-%d")
+        if today - file_date >= datetime.timedelta(days=7):
+            obtain = True
+    if obtain:
+        logger.info("Obtaining anime list")
+        file = request(
+            "GET",
+            url="https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json",
+        )
+        file_contents = file.content.decode("utf-8")
+        json_obj = json.loads(file_contents)
+        ani_list = {}
+        ani_list["date"] = datetime.date.today().strftime("%Y-%m-%d")
+        ani_list["shows"] = json_obj
+        with open(DATA_DIR + "/anime_list.json", "w") as f:
+            json.dump(ani_list, f, indent=4)
 
 
 trakt.core.OAUTH_TOKEN = config["TRAKT"]["oauth_token"]
@@ -162,10 +189,9 @@ def main():
         setup_trakt()
 
     me = User(config["TRAKT"]["username"])
-    print(me)
 
-    if os.path.isfile(DATA_DIR + "\shows_cache.json"):
-        with open(DATA_DIR + "\shows_cache.json") as f:
+    if os.path.isfile(DATA_DIR + "/shows_cache.json"):
+        with open(DATA_DIR + "/shows_cache.json") as f:
             shows_cache = json.load(f)
     else:
         shows_cache = None
@@ -175,8 +201,10 @@ def main():
     movies = me.watched_movies
     anime_movies, other_movies = get_anime_movies(movies)
 
-    with open(DATA_DIR + "\shows_cache.json", "w") as outfile:
-        json.dump(shows, outfile)
+    with open(DATA_DIR + "/shows_cache.json", "w") as outfile:
+        json.dump(shows, outfile, indent=4)
+
+    verify_anime_list()
 
 
 if __name__ == "__main__":
