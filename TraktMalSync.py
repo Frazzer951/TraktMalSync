@@ -1,9 +1,9 @@
-from collections import defaultdict
 import configparser
 import datetime
 import json
 import logging.handlers
 import os
+from collections import defaultdict
 
 import trakt
 from requests import request
