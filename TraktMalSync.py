@@ -1,3 +1,4 @@
+from collections import defaultdict
 import configparser
 import datetime
 import json
@@ -171,9 +172,23 @@ def verify_anime_list():
         json_obj = json.loads(file_contents)
         ani_list = {}
         ani_list["date"] = datetime.date.today().strftime("%Y-%m-%d")
-        ani_list["shows"] = json_obj
+
+        tvdb_to_mal = defaultdict(list)
+
+        for show in json_obj:
+            if "mal_id" in show and "thetvdb_id" in show:
+                tvdb_to_mal[show["thetvdb_id"]].append(str(show["mal_id"]))
+
+        ani_list["shows"] = tvdb_to_mal
+
         with open(DATA_DIR + "/anime_list.json", "w") as f:
             json.dump(ani_list, f, indent=4)
+
+
+def get_anime_list():
+    with open(DATA_DIR + "/anime_list.json") as f:
+        data = json.load(f)
+    return data["shows"]
 
 
 trakt.core.OAUTH_TOKEN = config["TRAKT"]["oauth_token"]
@@ -205,6 +220,29 @@ def main():
         json.dump(shows, outfile, indent=4)
 
     verify_anime_list()
+
+    tvdb_to_mal = get_anime_list()
+
+    conversion_dict = {}
+
+    if os.path.isfile(DATA_DIR + "/conversion_dict.json"):
+        with open(DATA_DIR + "/conversion_dict.json") as f:
+            conversion_dict = json.load(f)
+
+    for title in shows["anime"]:
+        show = shows["anime"][title]
+        id = str(show["tvdb_id"])
+        if id in tvdb_to_mal:
+            conversion_dict[title] = {
+                "title": show["title"],
+                "mal_ids": tvdb_to_mal[id],
+                "tvdb_id": id,
+            }
+        else:
+            logging.warning(f"No MAL ID found for {show['title']}")
+
+    with open(DATA_DIR + "/conversion_dict.json", "w") as outfile:
+        json.dump(conversion_dict, outfile, indent=4)
 
 
 if __name__ == "__main__":
