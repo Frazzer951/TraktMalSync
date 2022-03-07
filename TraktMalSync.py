@@ -115,8 +115,6 @@ def main():
         logger.info("Trakt OAuth token invalid,re-authenticating")
         setup_trakt()
 
-    setup_tvdb()
-
     me = User(config["TRAKT"]["username"])
     print(me)
 
