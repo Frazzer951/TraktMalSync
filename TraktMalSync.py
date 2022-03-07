@@ -9,6 +9,7 @@ from trakt.tv import TVShow
 from trakt.users import User
 
 logger = logging.getLogger("TraktMalSync")
+DATA_DIR = "data"
 
 
 def setup_logging():
@@ -40,7 +41,7 @@ def setup_logging():
 
 def save_config(config):
     logger.info("Saving config")
-    with open("config.ini", "w") as configfile:
+    with open(DATA_DIR + "\config.ini", "w") as configfile:
         config.write(configfile)
 
 
@@ -54,11 +55,14 @@ def get_config():
         "oauth_token": "",
     }
 
-    if not os.path.isfile("config.ini"):
+    if not os.path.isdir(DATA_DIR):
+        os.mkdir(DATA_DIR)
+
+    if not os.path.isfile(DATA_DIR + "\config.ini"):
         logger.info("No config file found, creating one")
         save_config(config)
 
-    config.read("config.ini")
+    config.read(DATA_DIR + "\config.ini")
 
     return config
 
@@ -160,8 +164,8 @@ def main():
     me = User(config["TRAKT"]["username"])
     print(me)
 
-    if os.path.isfile("shows_cache.json"):
-        with open("shows_cache.json") as f:
+    if os.path.isfile(DATA_DIR + "\shows_cache.json"):
+        with open(DATA_DIR + "\shows_cache.json") as f:
             shows_cache = json.load(f)
     else:
         shows_cache = None
@@ -171,7 +175,7 @@ def main():
     movies = me.watched_movies
     anime_movies, other_movies = get_anime_movies(movies)
 
-    with open("shows_cache.json", "w") as outfile:
+    with open(DATA_DIR + "\shows_cache.json", "w") as outfile:
         json.dump(shows, outfile)
 
 
