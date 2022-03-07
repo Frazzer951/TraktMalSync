@@ -1,11 +1,12 @@
 import configparser
-import json
-import os
-import logging.handlers
-import trakt
-from trakt.users import User
-from trakt.tv import TVShow
 import datetime
+import json
+import logging.handlers
+import os
+
+import trakt
+from trakt.tv import TVShow
+from trakt.users import User
 
 logger = logging.getLogger("TraktMalSync")
 
@@ -106,7 +107,7 @@ def get_anime_shows(shows, shows_cache, force_update=False):
                 )
                 if cached_date >= last_updated:
                     continue
-        logger.info("Checking show: {}".format(show.slug))
+        logger.info(f"Checking show: {show.slug}")
         genres = TVShow(show.slug).genres
         if genres:
             if "anime" in genres:
@@ -129,7 +130,7 @@ def get_anime_shows(shows, shows_cache, force_update=False):
             else:
                 shows_dict["other"].append(show.slug)
         else:
-            logger.info("No genres found for {}".format(show.title))
+            logger.info(f"No genres found for {show.title}")
     print("Shows Filtered")
     return shows_dict
 
@@ -160,7 +161,7 @@ def main():
     print(me)
 
     if os.path.isfile("shows_cache.json"):
-        with open("shows_cache.json", "r") as f:
+        with open("shows_cache.json") as f:
             shows_cache = json.load(f)
     else:
         shows_cache = None
