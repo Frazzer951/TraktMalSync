@@ -1,11 +1,9 @@
 import configparser
 import os
 import logging.handlers
-import sys
-from tracemalloc import stop
 import trakt
 from trakt.users import User
-import tvdb_api
+
 
 logger = logging.getLogger("TraktMalSync")
 
@@ -52,7 +50,6 @@ def get_config():
         "client_secret": "",
         "oauth_token": "",
     }
-    config["TVDB"] = {"api_key": ""}
 
     if not os.path.isfile("config.ini"):
         logger.info("No config file found, creating one")
@@ -86,30 +83,26 @@ def setup_trakt():
     save_config(config)
 
 
-def setup_tvdb():
-    if not config["TVDB"]["api_key"]:
-        config["TVDB"]["api_key"] = input("Please enter your TVDB API Key: ")
-
-    tvdb = tvdb_api.Tvdb(apikey=config["TVDB"]["api_key"])
-
-    save_config(config)
-    return tvdb
-
-
 def get_anime_shows(shows):
     anime_shows = []
     other_shows = []
     for show in shows:
-        tvdb_id = show.tvdb
-        tvdb_show = TVDB[tvdb_id]
-        if "Anime" in tvdb_show.data["genre"]:
-            anime_shows.append(show)
-        else:
-            other_shows.append(show)
+        if show.genres:
+            print(show.title, ":", show.genres)
+    print("Shows Filtered")
     return anime_shows, other_shows
 
 
-TVDB = setup_tvdb()
+def get_anime_movies(movies):
+    anime_movies = []
+    other_movies = []
+    for movie in movies:
+        if movie.genres:
+            print(movie.title, ":", movie.genres)
+    print("Movies Filtered")
+    return anime_movies, other_movies
+
+
 trakt.core.OAUTH_TOKEN = config["TRAKT"]["oauth_token"]
 trakt.core.CLIENT_ID = config["TRAKT"]["client_id"]
 trakt.core.CLIENT_SECRET = config["TRAKT"]["client_secret"]
@@ -133,9 +126,7 @@ def main():
     # print(movies)
 
     anime_shows, other = get_anime_shows(shows)
-
-    print(anime_shows)
-    print(other)
+    anime_movies, other = get_anime_movies(movies)
 
 
 if __name__ == "__main__":
