@@ -4,7 +4,7 @@ This script will sync you trakt watch history with your MAL Watch histroy
 ## TODO
 - [ ] Get Watch History From Trakt
   - [x] Get Watched Show
-  - [ ] Filter Shows to be Anime Only 
+  - [x] Filter Shows to be Anime Only
 - [ ] Match with equivalent entry on MAL
 - [ ] Sync Them Together
 - [ ] Use files from [anime-list](https://github.com/Fribb/anime-lists) repo to find connections.

@@ -1,9 +1,11 @@
 import configparser
+import json
 import os
 import logging.handlers
 import trakt
 from trakt.users import User
-
+from trakt.tv import TVShow
+import datetime
 
 logger = logging.getLogger("TraktMalSync")
 
@@ -83,14 +85,53 @@ def setup_trakt():
     save_config(config)
 
 
-def get_anime_shows(shows):
-    anime_shows = []
-    other_shows = []
+def get_anime_shows(shows, shows_cache, force_update=False):
+    if shows_cache and not force_update:
+        shows_dict = shows_cache
+    else:
+        shows_dict = {"anime": {}, "other": []}
     for show in shows:
-        if show.genres:
-            print(show.title, ":", show.genres)
+        if force_update == False:
+            if show.slug in shows_dict["other"]:
+                continue
+            cached_date = (
+                shows_dict["anime"].get(show.slug, {}).get("last_updated", None)
+            )
+            if cached_date:
+                cached_date = datetime.datetime.strptime(
+                    cached_date, "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+                last_updated = datetime.datetime.strptime(
+                    show.last_updated_at, "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+                if cached_date >= last_updated:
+                    continue
+        logger.info("Checking show: {}".format(show.slug))
+        genres = TVShow(show.slug).genres
+        if genres:
+            if "anime" in genres:
+                show_obj = {
+                    "title": show.title,
+                    "tvdb_id": show.tvdb,
+                    "watched": {},
+                    "last_updated": show.last_updated_at,
+                }
+
+                for season in show.seasons:
+                    watched_eps = []
+                    for ep in season["episodes"]:
+                        if ep["plays"] > 0:
+                            watched_eps.append(ep["number"])
+                    if watched_eps:
+                        show_obj["watched"][season["number"]] = watched_eps
+
+                shows_dict["anime"][show.slug] = show_obj
+            else:
+                shows_dict["other"].append(show.slug)
+        else:
+            logger.info("No genres found for {}".format(show.title))
     print("Shows Filtered")
-    return anime_shows, other_shows
+    return shows_dict
 
 
 def get_anime_movies(movies):
@@ -118,13 +159,19 @@ def main():
     me = User(config["TRAKT"]["username"])
     print(me)
 
+    if os.path.isfile("shows_cache.json"):
+        with open("shows_cache.json", "r") as f:
+            shows_cache = json.load(f)
+    else:
+        shows_cache = None
     shows = me.watched_shows
-    movies = me.watched_movies
-    # print(shows)
-    # print(movies)
+    shows = get_anime_shows(shows, shows_cache)
 
-    anime_shows, other = get_anime_shows(shows)
-    anime_movies, other = get_anime_movies(movies)
+    movies = me.watched_movies
+    anime_movies, other_movies = get_anime_movies(movies)
+
+    with open("shows_cache.json", "w") as outfile:
+        json.dump(shows, outfile)
 
 
 if __name__ == "__main__":
