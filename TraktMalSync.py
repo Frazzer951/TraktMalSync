@@ -99,7 +99,7 @@ def get_anime_shows(shows, shows_cache, force_update=False):
     else:
         shows_dict = {"anime": {}, "other": []}
     for show in shows:
-        if force_update == False:
+        if not force_update:
             if show.slug in shows_dict["other"]:
                 continue
             cached_date = (
@@ -148,7 +148,7 @@ def get_anime_movies(movies, movies_cache, force_update=False):
     else:
         movies_dict = {"anime": {}, "other": []}
     for movie in movies:
-        if force_update == False:
+        if not force_update:
             if movie.slug in movies_dict["other"]:
                 continue
             cached_date = (
@@ -227,52 +227,49 @@ def get_anime_list():
     return data["shows"], data["movies"]
 
 
-trakt.core.OAUTH_TOKEN = config["TRAKT"]["oauth_token"]
-trakt.core.CLIENT_ID = config["TRAKT"]["client_id"]
-trakt.core.CLIENT_SECRET = config["TRAKT"]["client_secret"]
-
-
-def main():
+def verify_trakt():
     try:
         me = User(config["TRAKT"]["username"] or "frazzer951")
     except (trakt.errors.OAuthException, trakt.errors.ForbiddenException):
         logger.info("Trakt OAuth token invalid,re-authenticating")
         setup_trakt()
 
-    me = User(config["TRAKT"]["username"])
 
+def load_show_cache():
     if os.path.isfile(DATA_DIR + "/shows_cache.json"):
         with open(DATA_DIR + "/shows_cache.json") as f:
             shows_cache = json.load(f)
     else:
         shows_cache = None
-    shows = me.watched_shows
-    shows = get_anime_shows(shows, shows_cache)
+    return shows_cache
 
+
+def save_json(data, filename):
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=4)
+
+
+def load_movie_cache():
     if os.path.isfile(DATA_DIR + "/movies_cache.json"):
         with open(DATA_DIR + "/movies_cache.json") as f:
             movies_cache = json.load(f)
     else:
         movies_cache = None
-    movies = me.watched_movies
-    movies = get_anime_movies(movies, movies_cache)
+    return movies_cache
 
-    with open(DATA_DIR + "/shows_cache.json", "w") as outfile:
-        json.dump(shows, outfile, indent=4)
 
-    with open(DATA_DIR + "/movies_cache.json", "w") as outfile:
-        json.dump(movies, outfile, indent=4)
-
-    verify_anime_list()
-
-    tvdb_to_mal, tmdb_to_mal = get_anime_list()
-
-    conversion_dict = {}
-
+def load_conversion_dict():
     if os.path.isfile(DATA_DIR + "/conversion_dict.json"):
         with open(DATA_DIR + "/conversion_dict.json") as f:
             conversion_dict = json.load(f)
+    else:
+        conversion_dict = {}
+    return conversion_dict
 
+
+def get_anime_mappings(shows, movies):
+    conversion_dict = load_conversion_dict()
+    tvdb_to_mal, tmdb_to_mal = get_anime_list()
     for title in shows["anime"]:
         show = shows["anime"][title]
         id = str(show["tvdb_id"])
@@ -297,8 +294,32 @@ def main():
         else:
             logging.warning(f"No MAL ID found for {movie['title']}")
 
-    with open(DATA_DIR + "/conversion_dict.json", "w") as outfile:
-        json.dump(conversion_dict, outfile, indent=4)
+
+trakt.core.OAUTH_TOKEN = config["TRAKT"]["oauth_token"]
+trakt.core.CLIENT_ID = config["TRAKT"]["client_id"]
+trakt.core.CLIENT_SECRET = config["TRAKT"]["client_secret"]
+
+
+def main():
+    verify_trakt()
+    me = User(config["TRAKT"]["username"])
+
+    show_cache = load_show_cache()
+    shows = me.watched_shows
+    shows = get_anime_shows(shows, show_cache)
+
+    movie_cache = load_movie_cache()
+    movies = me.watched_movies
+    movies = get_anime_movies(movies, movie_cache)
+
+    save_json(shows, DATA_DIR + "/shows_cache.json")
+    save_json(movies, DATA_DIR + "/movies_cache.json")
+
+    verify_anime_list()
+
+    conversion_dict = get_anime_mappings(shows, movies)
+
+    save_json(conversion_dict, DATA_DIR + "/conversion_dict.json")
 
 
 if __name__ == "__main__":
