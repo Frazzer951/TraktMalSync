@@ -7,6 +7,7 @@ from collections import defaultdict
 
 import trakt
 from requests import request
+from trakt.movies import Movie
 from trakt.tv import TVShow
 from trakt.users import User
 
@@ -141,14 +142,44 @@ def get_anime_shows(shows, shows_cache, force_update=False):
     return shows_dict
 
 
-def get_anime_movies(movies):
-    anime_movies = []
-    other_movies = []
+def get_anime_movies(movies, movies_cache, force_update=False):
+    if movies_cache and not force_update:
+        movies_dict = movies_cache
+    else:
+        movies_dict = {"anime": {}, "other": []}
     for movie in movies:
-        if movie.genres:
-            print(movie.title, ":", movie.genres)
+        if force_update == False:
+            if movie.slug in movies_dict["other"]:
+                continue
+            cached_date = (
+                movies_dict["anime"].get(movie.slug, {}).get("last_updated", None)
+            )
+            if cached_date:
+                cached_date = datetime.datetime.strptime(
+                    cached_date, "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+                last_updated = datetime.datetime.strptime(
+                    movie.last_updated_at, "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+                if cached_date >= last_updated:
+                    continue
+        logger.info(f"Checking movie: {movie.slug}")
+        genres = Movie(movie.slug).genres
+        if genres:
+            if "anime" in genres:
+                movie_obj = {
+                    "title": movie.title,
+                    "tmdb_id": movie.ids["ids"]["tmdb"],
+                    "watched": movie.plays > 0,
+                    "last_updated": movie.last_updated_at,
+                }
+                movies_dict["anime"][movie.slug] = movie_obj
+            else:
+                movies_dict["other"].append(movie.slug)
+        else:
+            logger.info(f"No genres found for {movie.title}")
     logger.info("Movies Filtered")
-    return anime_movies, other_movies
+    return movies_dict
 
 
 def verify_anime_list():
@@ -174,12 +205,17 @@ def verify_anime_list():
         ani_list["date"] = datetime.date.today().strftime("%Y-%m-%d")
 
         tvdb_to_mal = defaultdict(list)
+        tmdb_to_mal = defaultdict(list)
 
-        for show in json_obj:
-            if "mal_id" in show and "thetvdb_id" in show:
-                tvdb_to_mal[show["thetvdb_id"]].append(str(show["mal_id"]))
+        for item in json_obj:
+            if "mal_id" in item:
+                if "thetvdb_id" in item:
+                    tvdb_to_mal[item["thetvdb_id"]].append(str(item["mal_id"]))
+                if "themoviedb_id" in item:
+                    tmdb_to_mal[item["themoviedb_id"]].append(str(item["mal_id"]))
 
         ani_list["shows"] = tvdb_to_mal
+        ani_list["movies"] = tmdb_to_mal
 
         with open(DATA_DIR + "/anime_list.json", "w") as f:
             json.dump(ani_list, f, indent=4)
@@ -188,7 +224,7 @@ def verify_anime_list():
 def get_anime_list():
     with open(DATA_DIR + "/anime_list.json") as f:
         data = json.load(f)
-    return data["shows"]
+    return data["shows"], data["movies"]
 
 
 trakt.core.OAUTH_TOKEN = config["TRAKT"]["oauth_token"]
@@ -213,15 +249,23 @@ def main():
     shows = me.watched_shows
     shows = get_anime_shows(shows, shows_cache)
 
+    if os.path.isfile(DATA_DIR + "/movies_cache.json"):
+        with open(DATA_DIR + "/movies_cache.json") as f:
+            movies_cache = json.load(f)
+    else:
+        movies_cache = None
     movies = me.watched_movies
-    anime_movies, other_movies = get_anime_movies(movies)
+    movies = get_anime_movies(movies, movies_cache)
 
     with open(DATA_DIR + "/shows_cache.json", "w") as outfile:
         json.dump(shows, outfile, indent=4)
 
+    with open(DATA_DIR + "/movies_cache.json", "w") as outfile:
+        json.dump(movies, outfile, indent=4)
+
     verify_anime_list()
 
-    tvdb_to_mal = get_anime_list()
+    tvdb_to_mal, tmdb_to_mal = get_anime_list()
 
     conversion_dict = {}
 
@@ -240,6 +284,18 @@ def main():
             }
         else:
             logging.warning(f"No MAL ID found for {show['title']}")
+
+    for title in movies["anime"]:
+        movie = movies["anime"][title]
+        id = str(movie["tmdb_id"])
+        if id in tmdb_to_mal:
+            conversion_dict[title] = {
+                "title": show["title"],
+                "mal_ids": tmdb_to_mal[id],
+                "tmdb_id": id,
+            }
+        else:
+            logging.warning(f"No MAL ID found for {movie['title']}")
 
     with open(DATA_DIR + "/conversion_dict.json", "w") as outfile:
         json.dump(conversion_dict, outfile, indent=4)
