@@ -260,6 +260,11 @@ def get_anime_mappings(shows, movies):
     tvdb_to_mal, tmdb_to_mal = get_anime_list()
     for title in shows["anime"]:
         show = shows["anime"][title]
+        if title in conversion_dict:
+            ignored = conversion_dict[title].get("ignore", False)
+            if ignored:
+                logger.info(f"Ignoring {title}")
+                continue
         id = str(show["tvdb_id"])
         if id in tvdb_to_mal:
             conversion_dict[title] = {
@@ -268,8 +273,25 @@ def get_anime_mappings(shows, movies):
                 "tvdb_id": id,
             }
         else:
-            logging.warning(f"No MAL ID found for {show['title']}")
+            logger.warning(f"No MAL ID found for {show['title']}")
             user_input = input("Would You like to manually specify a MAL ID? (y/n)")
+            if user_input.lower()[0] == "y":
+                mal_ids = input("Please enter the MAL IDs seperated by a comma: ")
+                mal_ids = [x.strip() for x in mal_ids.split(",")]
+                conversion_dict[title] = {
+                    "title": show["title"],
+                    "mal_ids": [mal_ids],
+                    "tvdb_id": id,
+                }
+            else:
+                user_input = input("Would you like to ignore this show? (y/n)")
+                if user_input.lower()[0] == "y":
+                    conversion_dict[title] = {
+                        "title": show["title"],
+                        "ignore": True,
+                    }
+                    continue
+        print("here")
 
     for title in movies["anime"]:
         movie = movies["anime"][title]
@@ -281,7 +303,7 @@ def get_anime_mappings(shows, movies):
                 "tmdb_id": id,
             }
         else:
-            logging.warning(f"No MAL ID found for {movie['title']}")
+            logger.warning(f"No MAL ID found for {movie['title']}")
     return conversion_dict
 
 
