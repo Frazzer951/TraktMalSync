@@ -102,16 +102,10 @@ def get_anime_shows(shows, shows_cache, force_update=False):
         if not force_update:
             if show.slug in shows_dict["other"]:
                 continue
-            cached_date = (
-                shows_dict["anime"].get(show.slug, {}).get("last_updated", None)
-            )
+            cached_date = shows_dict["anime"].get(show.slug, {}).get("last_updated", None)
             if cached_date:
-                cached_date = datetime.datetime.strptime(
-                    cached_date, "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
-                last_updated = datetime.datetime.strptime(
-                    show.last_updated_at, "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
+                cached_date = datetime.datetime.strptime(cached_date, "%Y-%m-%dT%H:%M:%S.%fZ")
+                last_updated = datetime.datetime.strptime(show.last_updated_at, "%Y-%m-%dT%H:%M:%S.%fZ")
                 if cached_date >= last_updated:
                     continue
         logger.info(f"Checking show: {show.slug}")
@@ -151,16 +145,10 @@ def get_anime_movies(movies, movies_cache, force_update=False):
         if not force_update:
             if movie.slug in movies_dict["other"]:
                 continue
-            cached_date = (
-                movies_dict["anime"].get(movie.slug, {}).get("last_updated", None)
-            )
+            cached_date = movies_dict["anime"].get(movie.slug, {}).get("last_updated", None)
             if cached_date:
-                cached_date = datetime.datetime.strptime(
-                    cached_date, "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
-                last_updated = datetime.datetime.strptime(
-                    movie.last_updated_at, "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
+                cached_date = datetime.datetime.strptime(cached_date, "%Y-%m-%dT%H:%M:%S.%fZ")
+                last_updated = datetime.datetime.strptime(movie.last_updated_at, "%Y-%m-%dT%H:%M:%S.%fZ")
                 if cached_date >= last_updated:
                     continue
         logger.info(f"Checking movie: {movie.slug}")
@@ -229,7 +217,7 @@ def get_anime_list():
 
 def verify_trakt():
     try:
-        me = User(config["TRAKT"]["username"] or "frazzer951")
+        User(config["TRAKT"]["username"] or "frazzer951")
     except (trakt.errors.OAuthException, trakt.errors.ForbiddenException):
         logger.info("Trakt OAuth token invalid,re-authenticating")
         setup_trakt()
@@ -264,7 +252,7 @@ def load_conversion_dict():
             conversion_dict = json.load(f)
     else:
         conversion_dict = {}
-    return conversion_dict
+    return conversion_dict if conversion_dict else {}
 
 
 def get_anime_mappings(shows, movies):
@@ -281,6 +269,7 @@ def get_anime_mappings(shows, movies):
             }
         else:
             logging.warning(f"No MAL ID found for {show['title']}")
+            user_input = input("Would You like to manually specify a MAL ID? (y/n)")
 
     for title in movies["anime"]:
         movie = movies["anime"][title]
@@ -293,6 +282,7 @@ def get_anime_mappings(shows, movies):
             }
         else:
             logging.warning(f"No MAL ID found for {movie['title']}")
+    return conversion_dict
 
 
 trakt.core.OAUTH_TOKEN = config["TRAKT"]["oauth_token"]
