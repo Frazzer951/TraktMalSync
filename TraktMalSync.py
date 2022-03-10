@@ -267,31 +267,59 @@ def get_anime_mappings(shows, movies):
                 continue
         id = str(show["tvdb_id"])
         if id in tvdb_to_mal:
-            conversion_dict[title] = {
-                "title": show["title"],
-                "mal_ids": tvdb_to_mal[id],
-                "tvdb_id": id,
-            }
+            show_conversion = conversion_dict.get(title, {})
+            show_conversion["title"] = show["title"]
+            show_conversion["mal_ids"] = tvdb_to_mal[id]
+            show_conversion["tvdb_id"] = id
+            conversion_dict[title] = show_conversion
         else:
             logger.warning(f"No MAL ID found for {show['title']}")
             user_input = input("Would You like to manually specify a MAL ID? (y/n)")
             if user_input.lower()[0] == "y":
                 mal_ids = input("Please enter the MAL IDs seperated by a comma: ")
                 mal_ids = [x.strip() for x in mal_ids.split(",")]
-                conversion_dict[title] = {
-                    "title": show["title"],
-                    "mal_ids": [mal_ids],
-                    "tvdb_id": id,
-                }
+                show_conversion = conversion_dict.get(title, {})
+                show_conversion["title"] = show["title"]
+                show_conversion["mal_ids"] = [mal_ids]
+                show_conversion["tvdb_id"] = id
+                conversion_dict[title] = show_conversion
             else:
                 user_input = input("Would you like to ignore this show? (y/n)")
                 if user_input.lower()[0] == "y":
-                    conversion_dict[title] = {
-                        "title": show["title"],
-                        "ignore": True,
-                    }
+                    show_conversion = conversion_dict.get(title, {})
+                    show_conversion["title"] = show["title"]
+                    show_conversion["ignore"] = True
+                    conversion_dict[title] = show_conversion
+
                     continue
-        print("here")
+                else:
+                    show_conversion = conversion_dict.get(title, {})
+                    show_conversion["title"] = show["title"]
+                    conversion_dict[title] = show_conversion
+
+        conversion_dict[title]["seasons"] = list(set(show["watched"].keys()))
+
+        mappings = conversion_dict[title].get("mappings", {})
+        mal_ids = conversion_dict[title].get("mal_ids", [])
+        mapped_seasons = []
+        for mal_id in mappings:
+            mapped_seasons.extend(mappings[mal_id])
+        if mal_ids:
+            mapped = list(set(mapped_seasons))
+            unmapped = [] if "*" in mapped else list(set(show["watched"].keys()) - set(mapped))
+            if unmapped:
+                if len(mal_ids) > 1:
+                    logger.warning(
+                        f"{show['title']} has multiple MAL IDs please manually specify the seasons in conversion_dict.json"
+                    )
+                elif len(show["watched"]) > 1:
+                    logger.warning(
+                        f"{show['title']} has multiple seasons please manually specify the seasons MAL ID in conversion_dict.json"
+                    )
+                else:
+                    mappings[mal_ids[0]] = list(show["watched"].keys())
+
+        conversion_dict[title]["mappings"] = mappings
 
     for title in movies["anime"]:
         movie = movies["anime"][title]
