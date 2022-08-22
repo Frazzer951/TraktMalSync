@@ -1,2 +1,2 @@
-configparser==5.2.0
+configparser==5.3.0
 trakt==3.4.0
